@@ -17,6 +17,10 @@
 #   linux          Kernel Image + DTB (KERNEL=mainline|arduino, see below)
 #   buildroot      Rootfs with tee-supplicant, xtest, the TAs and the ADSP image
 #   efi            agatti/output/efi.bin: FAT32 with extlinux.conf + Image + DTB
+#   firmware       Fetch the stock boot blobs and generate the partition layout
+#   flash-full     Full eMMC flash via rawprogram0.xml (GPT + stock firmware +
+#                  tz/uefi + efi + rootfs); flash-loader / flash-kernel update
+#                  only tz+uefi or efi+rootfs
 #   all            Everything above that produces files
 ################################################################################
 
@@ -93,6 +97,8 @@ BR2_TARGET_ROOTFS_EXT2_LABEL    = rootfs
 # where a modules_install would land (empty, the kernels have MODULES=n).
 BR2_ROOTFS_OVERLAY = $(OVERLAY_DIR) $(LINUX_PATH)/modules_dir
 
+FW_DIR          = $(CURDIR)/agatti/firmware
+
 include common.mk
 include toolchain.mk
 
@@ -101,9 +107,9 @@ include toolchain.mk
 ################################################################################
 .PHONY: all clean help
 
-all: bootimage linux buildroot efi
+all: bootimage linux buildroot efi firmware
 
-clean: bootimage-clean linux-clean buildroot-clean efi-clean
+clean: bootimage-clean linux-clean buildroot-clean efi-clean firmware-clean
 
 help:
 	@echo "Qualcomm QCM2290/QRB2210 (Agatti / Arduino UNO Q) build system"
@@ -113,6 +119,12 @@ help:
 	@echo "  make linux         Kernel Image + DTB (KERNEL=mainline|arduino)"
 	@echo "  make buildroot     Rootfs (out-br/images/rootfs.ext4)"
 	@echo "  make efi           agatti/output/efi.bin (extlinux.conf + Image + DTB)"
+	@echo "  make firmware      Fetch stock blobs + generate the partition layout (agatti/firmware/)"
+	@echo ""
+	@echo "Flash targets (board on the Bughopper, EDL via pytactl + qdl)"
+	@echo "  make flash-full    GPT + stock firmware + tz/uefi + efi + rootfs"
+	@echo "  make flash-loader  tz_a/b + uefi_a/b only"
+	@echo "  make flash-kernel  efi + rootfs only"
 	@echo ""
 	@echo "Per-component: optee-os u-boot tfa bl2-sign linux-defconfig linux-config and *-clean"
 
@@ -346,3 +358,126 @@ efi: linux
 
 efi-clean:
 	rm -f $(EFI_BIN) $(OUT_DIR)/extlinux.conf
+
+################################################################################
+# Stock boot firmware: fetched and generated into agatti/firmware/ (ignored)
+#
+#   - Qualcomm Software Center "QRB2210 boot binaries" release $(FW_RELEASE),
+#     anonymous download, sha256-pinned. Its LICENSE.qcom-2 is why the blobs
+#     are not committed. XBL, RPM, hypervisor, devcfg, QUP firmware, imagefv,
+#     multi_image, logfs, the firehose programmers, and the stock UEFI pieces
+#     (uefi_sec, uefi_dtbs) that only fill their partitions (we boot U-Boot).
+#   - qcom-ptool at a pinned revision, run on the qrb2210-unoq eMMC layout:
+#     GPT images, rawprogram0.xml, patch0.xml, zeros_*.bin. Needs python3-yaml
+#     and python3-jsonschema. rawprogram/patch are reproducible; only the GPT
+#     GUIDs differ between generations.
+#   - dtb.bin: 4 MiB FAT12 with the kernel DTB, the stock dtb_a/b partition
+#     format (unused by U-Boot, kept so the full flash matches the layout).
+# tz.mbn and uefi.elf come from bootimage.
+################################################################################
+FW_RELEASE  ?= 00021
+FW_ZIP      ?= Agatti_bootbinaries_$(FW_RELEASE).zip
+FW_URL      ?= https://softwarecenter.qualcomm.com/nexus/generic/product/chip/tech-package/QRB2210_bootbinaries.1.0/qrb2210_bootbinaries.1.0-test-device-public/$(FW_RELEASE)/$(FW_ZIP)
+FW_SHA256   ?= 26a8681834363cb8bc9e8149db27388406daf22af15d3b43c9649e180afb47f2
+FW_BLOBS     = xbl.elf rpm.mbn hypvm.mbn devcfg_iot.mbn qupv3fw.elf imagefv.elf \
+	       uefi_sec.mbn uefi_dtbs.elf multi_image.mbn logfs_ufs_8mb.bin \
+	       prog_firehose_ddr.elf prog_firehose_lite.elf LICENSE.qcom-2 readme.txt
+
+QCOM_PTOOL_URL  ?= https://github.com/qualcomm-linux/qcom-ptool.git
+QCOM_PTOOL_REV  ?= d7c0e81
+QCOM_PTOOL_PATH ?= $(ROOT)/qcom-ptool
+PTOOL_BOARD      = qrb2210-unoq
+PTOOL_LAYOUT     = $(QCOM_PTOOL_PATH)/platforms/$(PTOOL_BOARD)/emmc
+PTOOL_FILES      = gpt_main0.bin gpt_backup0.bin gpt_both0.bin rawprogram0.xml \
+		   patch0.xml zeros_1sector.bin zeros_33sectors.bin
+
+.PHONY: firmware firmware-blobs firmware-ptool firmware-clean
+
+firmware: firmware-blobs firmware-ptool $(FW_DIR)/dtb.bin
+
+$(DL_DIR)/$(FW_ZIP):
+	mkdir -p $(DL_DIR)
+	curl --retry 5 -sSfL -o $@.tmp $(FW_URL)
+	echo "$(FW_SHA256)  $@.tmp" | sha256sum -c - || { rm -f $@.tmp; exit 1; }
+	mv $@.tmp $@
+
+firmware-blobs: $(DL_DIR)/$(FW_ZIP)
+	mkdir -p $(FW_DIR)
+	cd $(FW_DIR) && unzip -o -q -j $< $(addprefix Agatti_bootbinaries/,$(FW_BLOBS))
+
+$(QCOM_PTOOL_PATH):
+	git clone -q $(QCOM_PTOOL_URL) $@
+	git -C $@ checkout -q $(QCOM_PTOOL_REV)
+
+firmware-ptool: | $(QCOM_PTOOL_PATH)
+	$(MAKE) -s -C $(QCOM_PTOOL_PATH) \
+		QCOM_PTOOL="env PYTHONPATH=$(QCOM_PTOOL_PATH) $(PYTHON3) -m qcom_ptool.cli" \
+		platforms/$(PTOOL_BOARD)/emmc/gpt
+	mkdir -p $(FW_DIR)
+	cp $(addprefix $(PTOOL_LAYOUT)/,$(PTOOL_FILES)) $(FW_DIR)/
+
+$(LINUX_DTB):
+	$(MAKE) -f agatti.mk KERNEL=$(KERNEL) linux
+
+$(FW_DIR)/dtb.bin: $(LINUX_DTB)
+	mkdir -p $(FW_DIR)
+	rm -f $@
+	truncate -s 4M $@
+	mkfs.fat -F 12 $@ >/dev/null
+	mcopy -i $@ $(LINUX_DTB) ::/combined-dtb.dtb
+
+firmware-clean:
+	rm -rf $(FW_DIR)
+
+################################################################################
+# Flash: board in EDL through the Bughopper (pytactl), images written by qdl.
+# flash-full needs firmware, bootimage, efi and buildroot; qdl takes partition
+# names as addresses and aborts the whole batch on the first unknown one.
+################################################################################
+QDL        ?= /home/xdev/qualcomm/reps/qdl.git/build/qdl
+PYTAC      ?= pytactl
+BUGHOPPER  ?= DK0HDRE8
+FLASH_DIR   = $(OUT_DIR)/flash
+ROOTFS_EXT4 = $(ROOT)/out-br/images/rootfs.ext4
+FW_FLASH_FILES = $(PTOOL_FILES) $(filter-out LICENSE.qcom-2 readme.txt prog_firehose_lite.elf,$(FW_BLOBS)) dtb.bin
+
+.PHONY: flash-full flash-loader flash-kernel
+
+flash-full: firmware
+	@for f in $(OUT_DIR)/tz.mbn $(OUT_DIR)/uefi.elf $(EFI_BIN) $(ROOTFS_EXT4); do \
+		test -f "$$f" || { echo "ERROR: $$f missing, run make all first"; exit 1; }; \
+	done
+	rm -rf $(FLASH_DIR)
+	mkdir -p $(FLASH_DIR)
+	cp $(addprefix $(FW_DIR)/,$(FW_FLASH_FILES)) $(FLASH_DIR)/
+	cp $(OUT_DIR)/tz.mbn $(OUT_DIR)/uefi.elf $(EFI_BIN) $(FLASH_DIR)/
+	cp $(ROOTFS_EXT4) $(FLASH_DIR)/rootfs.img
+	$(PYTAC) oneshot bootToEDL --serial=$(BUGHOPPER) || true
+	sleep 8
+	cd $(FLASH_DIR) && \
+		$(QDL) --storage emmc -R prog_firehose_ddr.elf rawprogram0.xml patch0.xml
+	@echo "Flash complete. Reset the board: $(PYTAC) oneshot reset --serial=$(BUGHOPPER)"
+
+flash-loader:
+	@for f in $(OUT_DIR)/tz.mbn $(OUT_DIR)/uefi.elf; do \
+		test -f "$$f" || { echo "ERROR: $$f missing, run make bootimage first"; exit 1; }; \
+	done
+	$(PYTAC) oneshot bootToEDL --serial=$(BUGHOPPER) || true
+	sleep 8
+	$(QDL) --storage emmc $(FW_DIR)/prog_firehose_ddr.elf \
+		write tz_a $(OUT_DIR)/tz.mbn \
+		write tz_b $(OUT_DIR)/tz.mbn \
+		write uefi_a $(OUT_DIR)/uefi.elf \
+		write uefi_b $(OUT_DIR)/uefi.elf
+	@echo "Bootloader flashed. Reset: $(PYTAC) oneshot reset --serial=$(BUGHOPPER)"
+
+flash-kernel:
+	@for f in $(EFI_BIN) $(ROOTFS_EXT4); do \
+		test -f "$$f" || { echo "ERROR: $$f missing, run make efi buildroot first"; exit 1; }; \
+	done
+	$(PYTAC) oneshot bootToEDL --serial=$(BUGHOPPER) || true
+	sleep 8
+	$(QDL) --storage emmc $(FW_DIR)/prog_firehose_ddr.elf \
+		write efi $(EFI_BIN) \
+		write rootfs $(ROOTFS_EXT4)
+	@echo "Kernel + rootfs flashed. Reset: $(PYTAC) oneshot reset --serial=$(BUGHOPPER)"
