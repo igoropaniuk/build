@@ -1,0 +1,20 @@
+Peripheral tests for the Arduino UNO Q (open firmware stack, agatti-next).
+
+  ./run-all.sh          everything; screen/USB-host parts skip without a dock
+  ./video.sh [N W H c]  venus encode/decode round trip (h264|h265)
+  ./gpu.sh [N]          A702: kernel side, kmscube + glmark2 on the monitor
+  ./display.sh [S]      DP connector, EDID, S seconds of colour bars
+  ./weston.sh           Weston + demo clients on the monitor
+  ./usb.sh [keys]       type-C role, devices behind the dock, keyboard
+  ./bluetooth.sh [S]    WCN39xx firmware, BlueZ, S-second scan
+  ./adsp.sh [N]         ADSP start/stop over OP-TEE PAS
+  ./buses.sh            I2C, SPI (MCU), UARTs, QUP firmware
+  ./tee.sh [full]       OP-TEE driver, PAS TA, xtest
+  ./system.sh           CPUs, memory, eMMC, cpuidle/cpufreq
+  ./audio.sh            DRAFT: needs the sound card in the device tree
+  ./wifi.sh [ssid psk]  DRAFT: needs the modem/WLAN firmware running
+
+Each script prints PASS/FAIL/SKIP lines and a summary; the exit status
+is non-zero when something failed. Logs of the heavier steps land in
+/tmp. Screen tests need the board on a type-C dock with a monitor.
+Details: agatti_docs/notes/peripheral-testing.md on the build host.

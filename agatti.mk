@@ -165,6 +165,7 @@ BR2_PACKAGE_FBV                 = y
 # agatti/overlay carries /lib/firmware (ADSP image, fetched); modules_dir is
 # where a modules_install would land (empty, the kernels have MODULES=n).
 BR2_ROOTFS_OVERLAY = $(OVERLAY_DIR) $(LINUX_PATH)/modules_dir
+BR2_ROOTFS_POST_BUILD_SCRIPT = $(ROOT)/build/agatti/br-post-build.sh
 
 FW_DIR          = $(CURDIR)/agatti/firmware
 

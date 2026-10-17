@@ -1,7 +1,6 @@
 #!/bin/sh
-# Display test: show the connected DRM connector, its EDID modes, then
-# scan out the SMPTE colour bars for a few seconds with modetest.
-set -e
+# Display test: show the connected DRM connector and its EDID modes, then
+# scan out SMPTE colour bars for a few seconds with modetest.
 SECS=${1:-8}
 for c in /sys/class/drm/card0-*; do
 	echo "$(basename "$c"): $(cat "$c/status"), $(wc -c < "$c/edid") bytes of EDID, modes: $(tr '\n' ' ' < "$c/modes")"
@@ -9,5 +8,11 @@ done
 CONN=$(modetest -M msm 2>/dev/null | awk '/^Connectors/{f=1;next} f&&/^[0-9]/&&$3=="connected"{print $1; exit}')
 CRTC=$(modetest -M msm 2>/dev/null | awk '/^CRTCs/{f=1;next} f&&/^[0-9]/{print $1; exit}')
 [ -n "$CONN" ] || { echo "no connected connector"; exit 1; }
-echo "== colour bars on connector $CONN, crtc $CRTC, first EDID mode, $SECS s"
-timeout "$SECS" modetest -M msm -s "$CONN@$CRTC:#0" || true
+MODE=$(head -1 /sys/class/drm/card0-DP-1/modes)
+echo "== colour bars on connector $CONN, crtc $CRTC, $MODE, $SECS s"
+modetest -M msm -s "$CONN@$CRTC:$MODE" </dev/null >/tmp/modetest.log 2>&1 &
+PID=$!
+sleep "$SECS"
+kill "$PID" 2>/dev/null
+wait "$PID" 2>/dev/null
+grep -iE 'setting mode|failed|error' /tmp/modetest.log | head -3

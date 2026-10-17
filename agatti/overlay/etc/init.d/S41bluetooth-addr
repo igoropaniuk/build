@@ -1,0 +1,26 @@
+#!/bin/sh
+# Give the WCN39xx a BD address and power it on. The controller has no
+# valid address of its own and no bootloader puts one in the device
+# tree, so BlueZ keeps hci0 unconfigured. Use a locally administered
+# address built from the eMMC serial number: stable per board, unique
+# enough across boards.
+
+case "$1" in
+start)
+	[ -d /sys/class/bluetooth/hci0 ] || exit 0
+	command -v btmgmt >/dev/null || exit 0
+	ser=$(cat /sys/block/mmcblk0/device/serial 2>/dev/null)
+	[ -n "$ser" ] || exit 0
+	h=$(printf '%08x' "$ser")
+	addr="02:00:$(echo "$h" | sed 's/\(..\)\(..\)\(..\)\(..\)/\1:\2:\3:\4/')"
+	# bluetoothd (S40) has to be up for the mgmt socket to be useful
+	for i in 1 2 3 4 5; do pidof bluetoothd >/dev/null && break; sleep 1; done
+	btmgmt -i hci0 public-addr "$addr" >/dev/null 2>&1
+	sleep 1
+	btmgmt -i hci0 power on >/dev/null 2>&1
+	echo "bluetooth: hci0 address $addr"
+	;;
+stop)
+	;;
+esac
+exit 0
