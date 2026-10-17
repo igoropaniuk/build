@@ -1,0 +1,13 @@
+config BR2_PACKAGE_RMTFS
+	bool "rmtfs"
+	depends on BR2_PACKAGE_HAS_UDEV
+	select BR2_PACKAGE_QRTR
+	help
+	  Remote file system QMI service: serves the modem's EFS
+	  partitions (modemst1/2, fsg, fsc) over the shared rmtfs
+	  memory and can boot the modem remoteproc (-s).
+
+	  https://github.com/linux-msm/rmtfs
+
+comment "rmtfs needs udev /dev management"
+	depends on !BR2_PACKAGE_HAS_UDEV

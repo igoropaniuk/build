@@ -146,6 +146,11 @@ BR2_PACKAGE_ALSA_UTILS_APLAY    = y
 BR2_PACKAGE_ALSA_UTILS_AMIXER   = y
 BR2_PACKAGE_ALSA_UTILS_SPEAKER_TEST = y
 BR2_PACKAGE_LIBQRTR_GLIB        = y
+# Modem userspace (br-ext packages): rmtfs serves the EFS partitions and
+# boots the modem, tqftpserv hands it the WLAN firmware over QRTR.
+BR2_PACKAGE_QRTR                = y
+BR2_PACKAGE_RMTFS               = y
+BR2_PACKAGE_TQFTPSERV           = y
 BR2_PACKAGE_LIBQMI              = y
 BR2_PACKAGE_UQMI                = y
 BR2_PACKAGE_STRACE              = y
@@ -388,13 +393,22 @@ linux-clean:
 # overlay prerequisites (ADSP firmware from linux-firmware, modules_dir).
 ################################################################################
 # Subsystem firmware from linux-firmware at a pinned commit, sha256-checked:
-# ADSP (LPASS), the A702 GPU zap shader, the venus video core and the
-# WCN39xx Bluetooth patch/NVM (ROM version 0x11, loaded over the GENI UART).
+# ADSP (LPASS), the A702 GPU zap shader, the venus video core, the
+# WCN39xx Bluetooth patch/NVM (ROM version 0x11, loaded over the GENI UART),
+# the modem (the WLAN firmware runs on its Q6) and the ath10k WCN3990 files
+# (wlanmdsp.mbn served to the modem by tqftpserv, firmware-5.bin and the
+# board-2.bin calibration data read by the ath10k_snoc driver).
 LINUX_FW_COMMIT ?= 8ecf764788f8dbf33fc1c483ddf91f882ad792b6
 LINUX_FW_URL    ?= https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain
 LINUX_FW_DIR     = $(OVERLAY_DIR)/lib/firmware
 LINUX_FW_FILES   = qcom/qcm2290/adsp.mbn qcom/qcm2290/a702_zap.mbn qcom/a702_sqe.fw \
-		   qcom/venus-6.0/venus.mbn qca/apbtfw11.tlv qca/apnv11.bin
+		   qcom/venus-6.0/venus.mbn qca/apbtfw11.tlv qca/apnv11.bin \
+		   qcom/qcm2290/modem.mbn ath10k/WCN3990/hw1.0/qcm2290/wlanmdsp.mbn \
+		   ath10k/WCN3990/hw1.0/qcm2290/firmware-5.bin ath10k/WCN3990/hw1.0/board-2.bin
+LINUX_FW_SHA256_ath10k/WCN3990/hw1.0/board-2.bin            = c03d801cba1233914d777644e368ea942f36064e805ba6102514dedb47e53c76
+LINUX_FW_SHA256_ath10k/WCN3990/hw1.0/qcm2290/firmware-5.bin = 80daf4f3a89e6ea8222e45387bb362c854fcd30c02e9da59ca723b39b269cdd2
+LINUX_FW_SHA256_ath10k/WCN3990/hw1.0/qcm2290/wlanmdsp.mbn   = 4a0f4d8a5d7cdc094a5b0b907f4b9906657b76070993fed4d8cc4ccf5776b515
+LINUX_FW_SHA256_qcom/qcm2290/modem.mbn    = 38b2d75d69fc214c3edd9cb4b2e5ec7e9fba53749d9ab95df3c5b7ef020084c8
 LINUX_FW_SHA256_qca/apbtfw11.tlv          = aa9b2ad6a0b8d7aba8b55db42a572fb037506f719bbf51abdf3f5599d9309b46
 LINUX_FW_SHA256_qca/apnv11.bin            = b0b4f633a82723ff200c95c26e2a38cf79dd03d5ee799879de7602b74e451dd1
 LINUX_FW_SHA256_qcom/a702_sqe.fw          = 01926573c9dd3f39721b5bea8e733fb7ca343200005c8f9c62dffbe85266b29e
@@ -410,8 +424,14 @@ LINUX_FW_SHA256_qcom/venus-6.0/venus.mbn  = 602d18992dbc11c7141472d4c68778d49277
 QUP_FW = $(LINUX_FW_DIR)/qcom/qcm2290/qupv3fw.elf
 
 .PHONY: adsp-firmware linux-firmware
-linux-firmware: $(addprefix $(LINUX_FW_DIR)/,$(LINUX_FW_FILES)) $(QUP_FW)
+linux-firmware: $(addprefix $(LINUX_FW_DIR)/,$(LINUX_FW_FILES)) $(QUP_FW) \
+		$(LINUX_FW_DIR)/qcom/qcm2290/wlanmdsp.mbn
 adsp-firmware: linux-firmware
+
+# tqftpserv looks for the files the modem requests next to the modem
+# firmware (qcom/qcm2290/); linux-firmware has the same symlink.
+$(LINUX_FW_DIR)/qcom/qcm2290/wlanmdsp.mbn: $(LINUX_FW_DIR)/ath10k/WCN3990/hw1.0/qcm2290/wlanmdsp.mbn
+	ln -sfn ../../ath10k/WCN3990/hw1.0/qcm2290/wlanmdsp.mbn $@
 
 $(LINUX_FW_DIR)/%:
 	mkdir -p $(dir $@)

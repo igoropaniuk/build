@@ -1,0 +1,25 @@
+From: Igor Opaniuk <igor.opaniuk@oss.qualcomm.com>
+Date: Fri, 17 Oct 2026 17:20:00 +0200
+Subject: [PATCH] meson: define systemd_system_unit_dir without systemd
+
+When neither the systemd pkg-config file nor the systemd-unit-prefix
+option is available the variable is never assigned and meson aborts
+with "Unknown variable systemd_system_unit_dir" at the install check.
+Initialise it to an empty string so the service file is simply skipped.
+
+Signed-off-by: Igor Opaniuk <igor.opaniuk@oss.qualcomm.com>
+---
+ meson.build | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -15,6 +15,7 @@ add_project_arguments('-DHAVE_ZSTD', language : 'c')
+ 
+ # Not required to build the executable,
+ # only to automatically retrieve the install dir for unit files
++systemd_system_unit_dir = ''
+ systemd = dependency('systemd', required : false)
+ if get_option('systemd-unit-prefix') != ''
+   systemd_system_unit_dir = get_option('systemd-unit-prefix')

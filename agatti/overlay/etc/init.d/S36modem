@@ -1,0 +1,27 @@
+#!/bin/sh
+# Bring up the modem DSP, which hosts the WLAN firmware. tqftpserv serves
+# the files the modem asks for over QRTR (wlanmdsp.mbn from
+# /lib/firmware/qcom/qcm2290), rmtfs serves the EFS partitions
+# (modemst1/2, fsg, fsc, by GPT label) through the rmtfs shared memory and,
+# with -s, starts the modem remoteproc itself once it is listening. The
+# ath10k_snoc driver then brings up wlan0 when the WLAN firmware is ready.
+
+case "$1" in
+start)
+	[ -e /dev/qcom_rmtfs_mem1 ] || { echo "modem: no rmtfs memory"; exit 0; }
+	# No automatic restart after a modem crash: with the open TEE the
+	# modem still dies in its HWKM init, and a recovery loop would keep
+	# reloading it every 100 ms. /root/tests/wifi.sh reports the state.
+	for r in /sys/class/remoteproc/remoteproc*; do
+		[ "$(cat $r/name 2>/dev/null)" = modem ] && echo disabled > $r/recovery
+	done
+	start-stop-daemon -S -b -q -x /usr/bin/tqftpserv
+	start-stop-daemon -S -b -q -x /usr/bin/rmtfs -- -P -s
+	echo "modem: tqftpserv and rmtfs started"
+	;;
+stop)
+	start-stop-daemon -K -q -x /usr/bin/rmtfs
+	start-stop-daemon -K -q -x /usr/bin/tqftpserv
+	;;
+esac
+exit 0
