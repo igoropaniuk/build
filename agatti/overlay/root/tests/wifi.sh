@@ -10,9 +10,16 @@ if [ ! -d "$M" ]; then
 	fail "no modem remoteproc"
 	summary; exit 1
 fi
+[ "$(cat $M/state)" = offline ] && { info "starting the modem"; echo start > $M/state 2>/dev/null; }
 i=0
 while [ "$(cat $M/state)" != running ] && [ $i -lt 30 ]; do sleep 1; i=$((i+1)); done
-[ "$(cat $M/state)" = running ] && pass "modem running ($M)" || fail "modem state: $(cat $M/state)"
+sleep 3	# a modem that crashes in its init does so within the first second
+if [ "$(cat $M/state)" = running ]; then
+	pass "modem running ($M)"
+else
+	fail "modem state: $(cat $M/state)"
+	info "$(dmesg | grep -i 'fatal error' | tail -1 | cut -c1-140)"
+fi
 [ -e /dev/qcom_rmtfs_mem1 ] && pass "rmtfs memory /dev/qcom_rmtfs_mem1" || fail "no rmtfs memory device"
 pidof rmtfs >/dev/null && pass "rmtfs running" || fail "rmtfs not running"
 pidof tqftpserv >/dev/null && pass "tqftpserv running" || fail "tqftpserv not running"
