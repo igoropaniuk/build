@@ -257,7 +257,7 @@ ARDUINO_DEFCONFIG = $(CURDIR)/agatti/kernel/agatti_arduino_defconfig
 # The built-in venus and adreno drivers request their firmware before the
 # rootfs is mounted, so those images are embedded in the kernel (the ADSP
 # one stays on the rootfs: remoteproc is started after boot).
-EMBEDDED_FW = qcom/qcm2290/a702_zap.mbn qcom/venus-6.0/venus.mbn \
+EMBEDDED_FW = qcom/qcm2290/a702_zap.mbn qcom/a702_sqe.fw qcom/venus-6.0/venus.mbn \
 	      qcom/qcm2290/qupv3fw.elf
 ifeq ($(KERNEL),mainline)
 LINUX_CONFIG_TWEAKS = \
@@ -318,7 +318,9 @@ linux-clean:
 LINUX_FW_COMMIT ?= 8ecf764788f8dbf33fc1c483ddf91f882ad792b6
 LINUX_FW_URL    ?= https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain
 LINUX_FW_DIR     = $(OVERLAY_DIR)/lib/firmware
-LINUX_FW_FILES   = qcom/qcm2290/adsp.mbn qcom/qcm2290/a702_zap.mbn qcom/venus-6.0/venus.mbn
+LINUX_FW_FILES   = qcom/qcm2290/adsp.mbn qcom/qcm2290/a702_zap.mbn qcom/a702_sqe.fw \
+		   qcom/venus-6.0/venus.mbn
+LINUX_FW_SHA256_qcom/a702_sqe.fw          = 01926573c9dd3f39721b5bea8e733fb7ca343200005c8f9c62dffbe85266b29e
 LINUX_FW_SHA256_qcom/qcm2290/adsp.mbn     = 2ba888211fc34fed355a5b2b83010dfd0b437036cc4f18df396dd2dc5fdb050a
 LINUX_FW_SHA256_qcom/qcm2290/a702_zap.mbn = 52ab67d0007c056d74b27bcbd4f9264fab4cdfb8ff872baf12eded2d3afe2d75
 LINUX_FW_SHA256_qcom/venus-6.0/venus.mbn  = 602d18992dbc11c7141472d4c68778d49277491ca7452ebf6115be0e6119572a
