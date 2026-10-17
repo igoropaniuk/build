@@ -254,6 +254,11 @@ LINUX_DTB        = $(LINUX_OUT)/arch/arm64/boot/dts/qcom/$(LINUX_DTB_NAME).dtb
 # do_boot bootargs instead.
 # Arduino tree: MODULES=n (its xt_mark.h header is broken, so NETFILTER too).
 ARDUINO_DEFCONFIG = $(CURDIR)/agatti/kernel/agatti_arduino_defconfig
+# The built-in venus and adreno drivers request their firmware before the
+# rootfs is mounted, so those images are embedded in the kernel (the ADSP
+# one stays on the rootfs: remoteproc is started after boot).
+EMBEDDED_FW = qcom/qcm2290/a702_zap.mbn qcom/venus-6.0/venus.mbn \
+	      qcom/qcm2290/qupv3fw.elf
 ifeq ($(KERNEL),mainline)
 LINUX_CONFIG_TWEAKS = \
 	-e TEE -e RPMB -e OPTEE -e DEVTMPFS -e EFI_BOOT -e EFI_ZBOOT \
@@ -265,6 +270,8 @@ LINUX_CONFIG_TWEAKS = \
 	-e QCOM_PDR_HELPERS -e QCOM_APR \
 	-e RPMSG -e RPMSG_QCOM_GLINK -e RPMSG_QCOM_GLINK_SMEM -e RPMSG_CHAR -e RPMSG_CTRL \
 	-e QCOM_FASTRPC -e DRM_MSM -e DRM_ANALOGIX_ANX7625 -e VIDEO_QCOM_VENUS \
+	--set-str EXTRA_FIRMWARE "$(EMBEDDED_FW)" \
+	--set-str EXTRA_FIRMWARE_DIR "$(LINUX_FW_DIR)" \
 	-d MODULES
 else
 LINUX_CONFIG_TWEAKS = \
@@ -306,25 +313,38 @@ linux-clean:
 # Buildroot rootfs: the target itself comes from common.mk; this adds the
 # overlay prerequisites (ADSP firmware from linux-firmware, modules_dir).
 ################################################################################
-ADSP_FW_COMMIT ?= a32c856835b5ebdf901b857702cb02fc330ff5c6
-ADSP_FW_URL    ?= https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/qcom/qcm2290/adsp.mbn?id=$(ADSP_FW_COMMIT)
-ADSP_FW_SHA256 ?= 2ba888211fc34fed355a5b2b83010dfd0b437036cc4f18df396dd2dc5fdb050a
-ADSP_FW         = $(OVERLAY_DIR)/lib/firmware/qcom/qcm2290/adsp.mbn
+# Subsystem firmware from linux-firmware at a pinned commit, sha256-checked:
+# ADSP (LPASS), the A702 GPU zap shader and the venus video core.
+LINUX_FW_COMMIT ?= 8ecf764788f8dbf33fc1c483ddf91f882ad792b6
+LINUX_FW_URL    ?= https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain
+LINUX_FW_DIR     = $(OVERLAY_DIR)/lib/firmware
+LINUX_FW_FILES   = qcom/qcm2290/adsp.mbn qcom/qcm2290/a702_zap.mbn qcom/venus-6.0/venus.mbn
+LINUX_FW_SHA256_qcom/qcm2290/adsp.mbn     = 2ba888211fc34fed355a5b2b83010dfd0b437036cc4f18df396dd2dc5fdb050a
+LINUX_FW_SHA256_qcom/qcm2290/a702_zap.mbn = 52ab67d0007c056d74b27bcbd4f9264fab4cdfb8ff872baf12eded2d3afe2d75
+LINUX_FW_SHA256_qcom/venus-6.0/venus.mbn  = 602d18992dbc11c7141472d4c68778d49277491ca7452ebf6115be0e6119572a
 
-.PHONY: adsp-firmware
-adsp-firmware: $(ADSP_FW)
+# The GENI QUP firmware is not in linux-firmware; it comes from the stock
+# boot binaries (qupv3fw.elf, otherwise loaded by QTEE from the qupfw
+# partition) and lets the kernel's geni-se driver program the serial
+# engines that no firmware initialised. The rule lives in the firmware
+# section, after the zip variables it depends on.
+QUP_FW = $(LINUX_FW_DIR)/qcom/qcm2290/qupv3fw.elf
 
-$(ADSP_FW):
+.PHONY: adsp-firmware linux-firmware
+linux-firmware: $(addprefix $(LINUX_FW_DIR)/,$(LINUX_FW_FILES)) $(QUP_FW)
+adsp-firmware: linux-firmware
+
+$(LINUX_FW_DIR)/%:
 	mkdir -p $(dir $@)
-	curl --retry 5 -sSfL -o $@.tmp '$(ADSP_FW_URL)'
-	echo "$(ADSP_FW_SHA256)  $@.tmp" | sha256sum -c - || { rm -f $@.tmp; exit 1; }
+	curl --retry 5 -sSfL -o $@.tmp '$(LINUX_FW_URL)/$*?id=$(LINUX_FW_COMMIT)'
+	echo "$(LINUX_FW_SHA256_$*)  $@.tmp" | sha256sum -c - || { rm -f $@.tmp; exit 1; }
 	mv $@.tmp $@
 
 # Buildroot's target-finalize rsyncs every overlay and fails if one is absent.
 $(LINUX_PATH)/modules_dir:
 	mkdir -p $@
 
-buildroot: $(ADSP_FW) $(LINUX_PATH)/modules_dir
+buildroot: linux-firmware $(LINUX_PATH)/modules_dir
 
 ################################################################################
 # efi.bin: FAT32 boot partition image with extlinux/extlinux.conf, Image and
@@ -404,6 +424,10 @@ $(DL_DIR)/$(FW_ZIP):
 firmware-blobs: $(DL_DIR)/$(FW_ZIP)
 	mkdir -p $(FW_DIR)
 	cd $(FW_DIR) && unzip -o -q -j $< $(addprefix Agatti_bootbinaries/,$(FW_BLOBS))
+
+$(QUP_FW): $(DL_DIR)/$(FW_ZIP)
+	mkdir -p $(dir $@)
+	unzip -o -q -j $< Agatti_bootbinaries/qupv3fw.elf -d $(dir $@)
 
 $(QCOM_PTOOL_PATH):
 	git clone -q $(QCOM_PTOOL_URL) $@
