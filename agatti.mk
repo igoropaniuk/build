@@ -258,7 +258,7 @@ ARDUINO_DEFCONFIG = $(CURDIR)/agatti/kernel/agatti_arduino_defconfig
 # rootfs is mounted, so those images are embedded in the kernel (the ADSP
 # one stays on the rootfs: remoteproc is started after boot).
 EMBEDDED_FW = qcom/qcm2290/a702_zap.mbn qcom/a702_sqe.fw qcom/venus-6.0/venus.mbn \
-	      qcom/qcm2290/qupv3fw.elf
+	      qcom/qcm2290/qupv3fw.elf qca/apbtfw11.tlv qca/apnv11.bin
 ifeq ($(KERNEL),mainline)
 LINUX_CONFIG_TWEAKS = \
 	-e TEE -e RPMB -e OPTEE -e DEVTMPFS -e EFI_BOOT -e EFI_ZBOOT \
@@ -314,12 +314,15 @@ linux-clean:
 # overlay prerequisites (ADSP firmware from linux-firmware, modules_dir).
 ################################################################################
 # Subsystem firmware from linux-firmware at a pinned commit, sha256-checked:
-# ADSP (LPASS), the A702 GPU zap shader and the venus video core.
+# ADSP (LPASS), the A702 GPU zap shader, the venus video core and the
+# WCN39xx Bluetooth patch/NVM (ROM version 0x11, loaded over the GENI UART).
 LINUX_FW_COMMIT ?= 8ecf764788f8dbf33fc1c483ddf91f882ad792b6
 LINUX_FW_URL    ?= https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain
 LINUX_FW_DIR     = $(OVERLAY_DIR)/lib/firmware
 LINUX_FW_FILES   = qcom/qcm2290/adsp.mbn qcom/qcm2290/a702_zap.mbn qcom/a702_sqe.fw \
-		   qcom/venus-6.0/venus.mbn
+		   qcom/venus-6.0/venus.mbn qca/apbtfw11.tlv qca/apnv11.bin
+LINUX_FW_SHA256_qca/apbtfw11.tlv          = aa9b2ad6a0b8d7aba8b55db42a572fb037506f719bbf51abdf3f5599d9309b46
+LINUX_FW_SHA256_qca/apnv11.bin            = b0b4f633a82723ff200c95c26e2a38cf79dd03d5ee799879de7602b74e451dd1
 LINUX_FW_SHA256_qcom/a702_sqe.fw          = 01926573c9dd3f39721b5bea8e733fb7ca343200005c8f9c62dffbe85266b29e
 LINUX_FW_SHA256_qcom/qcm2290/adsp.mbn     = 2ba888211fc34fed355a5b2b83010dfd0b437036cc4f18df396dd2dc5fdb050a
 LINUX_FW_SHA256_qcom/qcm2290/a702_zap.mbn = 52ab67d0007c056d74b27bcbd4f9264fab4cdfb8ff872baf12eded2d3afe2d75
