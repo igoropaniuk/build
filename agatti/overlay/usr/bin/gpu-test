@@ -1,0 +1,10 @@
+#!/bin/sh
+# GPU test on the Arduino UNO Q: render with the A702 through freedreno
+# and scan out on the DisplayPort output. Prints the frame rate.
+set -e
+FRAMES=${1:-600}
+[ -e /dev/dri/card0 ] || { echo "no /dev/dri/card0 (msm DRM not probed)"; exit 1; }
+echo "== DRM devices"; ls -l /dev/dri/
+echo "== zap shader / GPU state"; dmesg | grep -iE 'adreno|zap|gpu' | tail -5
+echo "== kmscube, $FRAMES frames (GLES2 on freedreno, KMS scanout)"
+kmscube -D /dev/dri/card0 -c "$FRAMES"

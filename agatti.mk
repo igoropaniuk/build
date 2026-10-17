@@ -93,6 +93,75 @@ BR2_TARGET_ROOTFS_EXT2          = y
 BR2_TARGET_ROOTFS_EXT2_4        = y
 BR2_TARGET_ROOTFS_EXT2_SIZE     = 512M
 BR2_TARGET_ROOTFS_EXT2_LABEL    = rootfs
+# Bring-up and test userspace for the peripherals under work:
+# display/GPU (modetest, kmscube on freedreno), venus (v4l2-ctl, gstreamer
+# with the v4l2 codec plugins), Bluetooth (BlueZ), WiFi (wpa_supplicant,
+# iw, regulatory db, iproute2), I2C/SPI/USB/input tools, audio (aplay,
+# amixer), QMI/QRTR libraries for the modem, ssh, debugging.
+BR2_PACKAGE_LIBDRM              = y
+BR2_PACKAGE_LIBDRM_FREEDRENO    = y
+BR2_PACKAGE_LIBDRM_INSTALL_TESTS = y
+BR2_PACKAGE_MESA3D              = y
+BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_FREEDRENO = y
+BR2_PACKAGE_MESA3D_OPENGL_EGL   = y
+BR2_PACKAGE_MESA3D_OPENGL_ES    = y
+BR2_PACKAGE_KMSCUBE             = y
+BR2_PACKAGE_LIBV4L              = y
+BR2_PACKAGE_LIBV4L_UTILS        = y
+BR2_PACKAGE_GSTREAMER1          = y
+BR2_PACKAGE_GST1_PLUGINS_BASE   = y
+BR2_PACKAGE_GST1_PLUGINS_GOOD   = y
+BR2_PACKAGE_GST1_PLUGINS_GOOD_PLUGIN_V4L2 = y
+BR2_PACKAGE_GST1_PLUGINS_GOOD_PLUGIN_V4L2_PROBE = y
+BR2_PACKAGE_GST1_PLUGINS_BAD    = y
+BR2_PACKAGE_GST1_PLUGINS_BAD_PLUGIN_V4L2CODECS = y
+BR2_PACKAGE_GST1_PLUGINS_BAD_PLUGIN_KMS = y
+BR2_PACKAGE_GST1_PLUGINS_BASE_PLUGIN_VIDEOTESTSRC = y
+BR2_PACKAGE_GST1_PLUGINS_BASE_PLUGIN_VIDEOCONVERTSCALE = y
+BR2_PACKAGE_GST1_PLUGINS_BASE_PLUGIN_PLAYBACK = y
+BR2_PACKAGE_GST1_PLUGINS_BASE_PLUGIN_TYPEFIND = y
+BR2_PACKAGE_GST1_PLUGINS_BASE_PLUGIN_APP = y
+BR2_PACKAGE_GST1_PLUGINS_GOOD_PLUGIN_ISOMP4 = y
+BR2_PACKAGE_GST1_PLUGINS_BAD_PLUGIN_VIDEOPARSERS = y
+BR2_PACKAGE_GST1_PLUGINS_BAD_PLUGIN_DEBUGUTILS = y
+BR2_PACKAGE_BLUEZ5_UTILS        = y
+BR2_PACKAGE_BLUEZ5_UTILS_CLIENT = y
+BR2_PACKAGE_BLUEZ5_UTILS_TOOLS  = y
+BR2_PACKAGE_BLUEZ5_UTILS_DEPRECATED = y
+BR2_PACKAGE_WPA_SUPPLICANT      = y
+BR2_PACKAGE_WPA_SUPPLICANT_NL80211 = y
+BR2_PACKAGE_WPA_SUPPLICANT_CLI  = y
+BR2_PACKAGE_IW                  = y
+BR2_PACKAGE_WIRELESS_REGDB      = y
+BR2_PACKAGE_IPROUTE2            = y
+BR2_PACKAGE_ETHTOOL             = y
+BR2_PACKAGE_TCPDUMP             = y
+BR2_PACKAGE_DROPBEAR            = y
+BR2_PACKAGE_I2C_TOOLS           = y
+BR2_PACKAGE_SPI_TOOLS           = y
+BR2_PACKAGE_USBUTILS            = y
+BR2_PACKAGE_EVTEST              = y
+BR2_PACKAGE_ALSA_UTILS          = y
+BR2_PACKAGE_ALSA_UTILS_APLAY    = y
+BR2_PACKAGE_ALSA_UTILS_AMIXER   = y
+BR2_PACKAGE_LIBQRTR_GLIB        = y
+BR2_PACKAGE_LIBQMI              = y
+BR2_PACKAGE_UQMI                = y
+BR2_PACKAGE_STRACE              = y
+BR2_PACKAGE_GDB                 = y
+BR2_PACKAGE_GDB_SERVER          = y
+BR2_PACKAGE_HTOP                = y
+BR2_PACKAGE_MEMTOOL             = y
+# Something visible on the monitor: Weston on the DRM backend (needs udev,
+# hence eudev instead of mdev), its demo clients, glmark2 and fbv.
+BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_EUDEV = y
+BR2_PACKAGE_WESTON              = y
+BR2_PACKAGE_WESTON_DRM          = y
+BR2_PACKAGE_WESTON_DEFAULT_DRM  = y
+BR2_PACKAGE_WESTON_DEMO_CLIENTS = y
+BR2_PACKAGE_GLMARK2             = y
+BR2_PACKAGE_MESA3D_DEMOS        = y
+BR2_PACKAGE_FBV                 = y
 # agatti/overlay carries /lib/firmware (ADSP image, fetched); modules_dir is
 # where a modules_install would land (empty, the kernels have MODULES=n).
 BR2_ROOTFS_OVERLAY = $(OVERLAY_DIR) $(LINUX_PATH)/modules_dir
@@ -217,6 +286,9 @@ bl2-sign: $(SECURITY_PROFILE)
 		--cass-capability $(CASS_CAPABILITY) \
 		--qti-remote-signing-server-url $(CASS_SERVER_URL) \
 		--qti-remote-signing-server-port $(CASS_SERVER_PORT)
+	# bootimage deletes tz.mbn before signing; keep the last signed BL2
+	# so a failed CASS round trip still leaves something to flash.
+	cp $(OUT_DIR)/tz.mbn $(OUT_DIR)/tz.mbn.last-signed
 
 ################################################################################
 # Boot image: tz.mbn + uefi.elf (always flash both, BL2 with SPD=opteed
@@ -470,7 +542,7 @@ FLASH_DIR   = $(OUT_DIR)/flash
 ROOTFS_EXT4 = $(ROOT)/out-br/images/rootfs.ext4
 FW_FLASH_FILES = $(PTOOL_FILES) $(filter-out LICENSE.qcom-2 readme.txt prog_firehose_lite.elf,$(FW_BLOBS)) dtb.bin
 
-.PHONY: flash-full flash-loader flash-kernel
+.PHONY: flash-full flash-loader flash-uefi flash-kernel
 
 flash-full: firmware
 	@for f in $(OUT_DIR)/tz.mbn $(OUT_DIR)/uefi.elf $(EFI_BIN) $(ROOTFS_EXT4); do \
@@ -499,6 +571,18 @@ flash-loader:
 		write uefi_a $(OUT_DIR)/uefi.elf \
 		write uefi_b $(OUT_DIR)/uefi.elf
 	@echo "Bootloader flashed. Reset: $(PYTAC) oneshot reset --serial=$(BUGHOPPER)"
+
+# Only the FIP (BL31 + OP-TEE + U-Boot): for changes that leave BL2 alone,
+# and when the CASS signing server is unreachable. The tz partitions keep
+# the BL2 signed last time; it does not check the FIP while TBB is off.
+flash-uefi:
+	@test -f $(OUT_DIR)/uefi.elf || { echo "ERROR: $(OUT_DIR)/uefi.elf missing, run make tfa first"; exit 1; }
+	$(PYTAC) oneshot bootToEDL --serial=$(BUGHOPPER) || true
+	sleep 8
+	$(QDL) --storage emmc $(FW_DIR)/prog_firehose_ddr.elf \
+		write uefi_a $(OUT_DIR)/uefi.elf \
+		write uefi_b $(OUT_DIR)/uefi.elf
+	@echo "FIP flashed. Reset: $(PYTAC) oneshot reset --serial=$(BUGHOPPER)"
 
 flash-kernel:
 	@for f in $(EFI_BIN) $(ROOTFS_EXT4); do \

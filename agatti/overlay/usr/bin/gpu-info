@@ -1,0 +1,8 @@
+#!/bin/sh
+# GPU without a display: renderer string through GBM on the render node.
+if command -v eglinfo >/dev/null; then
+	eglinfo -B -p gbm 2>/dev/null | grep -iE 'vendor|renderer|version' | head -8 ||
+	eglinfo 2>/dev/null | grep -iE 'renderer|version' | head -8
+else
+	es2_info 2>/dev/null | head -8 || echo "no eglinfo/es2_info in the image"
+fi

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Start Weston on the DRM backend and a couple of demo clients.
+export XDG_RUNTIME_DIR=/run/user/0
+mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR"
+weston --backend=drm --log=/tmp/weston.log &
+sleep 4
+export WAYLAND_DISPLAY=wayland-1
+weston-simple-egl &
+weston-flower &
+echo "weston running (log /tmp/weston.log); 'killall weston' to stop"

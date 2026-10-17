@@ -1,0 +1,3 @@
+#!/bin/sh
+# glmark2 on the DRM/GBM backend: a longer GPU benchmark with a score.
+exec glmark2-es2-drm "$@"
