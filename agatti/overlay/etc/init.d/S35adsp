@@ -1,0 +1,18 @@
+#!/bin/sh
+# Start the ADSP once the root filesystem is mounted. Its firmware
+# (qcom/qcm2290/adsp.mbn) lives on the rootfs, so the remoteproc driver's
+# own boot attempt at probe time fails; the sound card, which plays
+# through the ADSP, binds once it runs.
+
+case "$1" in
+start)
+	r=$(dirname "$(grep -l adsp /sys/class/remoteproc/*/name 2>/dev/null | head -1)")
+	[ -d "$r" ] || exit 0
+	[ "$(cat "$r/state")" = running ] && exit 0
+	echo start > "$r/state" 2>/dev/null
+	echo "adsp: $(cat "$r/state")"
+	;;
+stop)
+	;;
+esac
+exit 0

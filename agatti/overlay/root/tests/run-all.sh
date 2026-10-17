@@ -4,7 +4,7 @@
 #   ./run-all.sh 2>&1 | tee /tmp/run-all.log
 cd "$(dirname "$0")"
 total=0; failed=""
-for t in system.sh buses.sh tee.sh adsp.sh video.sh bluetooth.sh usb.sh display.sh gpu.sh audio.sh wifi.sh; do
+for t in system.sh buses.sh tee.sh audio.sh video.sh bluetooth.sh adsp.sh usb.sh display.sh gpu.sh wifi.sh; do
 	echo; echo "######## $t"
 	sh ./$t || failed="$failed $t"
 	total=$((total + 1))

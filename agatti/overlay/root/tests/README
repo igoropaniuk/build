@@ -11,7 +11,8 @@ Peripheral tests for the Arduino UNO Q (open firmware stack, agatti-next).
   ./buses.sh            I2C, SPI (MCU), UARTs, QUP firmware
   ./tee.sh [full]       OP-TEE driver, PAS TA, xtest
   ./system.sh           CPUs, memory, eMMC, cpuidle/cpufreq
-  ./audio.sh            DRAFT: needs the sound card in the device tree
+  ./audio.sh [S]        PM4125 headphone path: card, route, tone, power state
+  ./audio-route.sh      route the card for playback/capture (used by audio.sh)
   ./wifi.sh [ssid psk]  DRAFT: needs the modem/WLAN firmware running
 
 Each script prints PASS/FAIL/SKIP lines and a summary; the exit status
