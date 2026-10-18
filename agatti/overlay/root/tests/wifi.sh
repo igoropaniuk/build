@@ -3,7 +3,7 @@
 # DSP, so this also checks the modem bring-up (rmtfs, tqftpserv, QRTR).
 #   ./wifi.sh              scan and list the visible networks, connect to none
 #   ./wifi.sh ssid psk     also associate, get a lease, ping, and time a 100 MB
-#                          download (the link stays up afterwards)
+#                          speedtest-cli run (the link stays up afterwards)
 . "$(dirname "$0")/lib.sh"
 
 section "modem"
@@ -61,15 +61,13 @@ if ip link show wlan0 >/dev/null 2>&1; then
 			gw=$(ip route | awk '/^default/ {print $3; exit}')
 			ping -c 3 -W 3 $gw >/dev/null 2>&1 && pass "ping gateway $gw" || fail "ping gateway $gw"
 			ping -c 3 -W 3 1.1.1.1 >/dev/null 2>&1 && pass "ping 1.1.1.1" || fail "ping 1.1.1.1"
-			section "download"
-			url=http://speedtest.newark.linode.com/100MB-newark.bin
-			t0=$(awk '{print int($1 * 100)}' /proc/uptime)
-			if wget -q -T 30 -O /dev/null "$url" 2>/dev/null; then
-				t1=$(awk '{print int($1 * 100)}' /proc/uptime)
-				dt=$((t1 - t0)); [ $dt -gt 0 ] || dt=1
-				pass "100 MB downloaded in $((dt / 100)).$((dt % 100 / 10)) s ($((100 * 100 / dt)).$((100 * 1000 / dt % 10)) MB/s)"
+			section "speedtest"
+			# speedtest-cli (sivel, Apache-2.0) against the nearest speedtest.net server
+			out=$(speedtest-cli --simple 2>&1)
+			if echo "$out" | grep -q '^Download:'; then
+				pass "$(echo "$out" | grep -E '^(Ping|Download|Upload):' | tr '\n' ' ' | sed 's/  */ /g')"
 			else
-				fail "download of $url"
+				fail "speedtest-cli: $(echo "$out" | grep -v -i -E 'warning|utcnow' | tail -1)"
 			fi
 		else
 			fail "DHCP"

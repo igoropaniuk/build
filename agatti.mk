@@ -132,6 +132,14 @@ BR2_PACKAGE_WPA_SUPPLICANT      = y
 BR2_PACKAGE_WPA_SUPPLICANT_NL80211 = y
 BR2_PACKAGE_WPA_SUPPLICANT_CLI  = y
 BR2_PACKAGE_IW                  = y
+# python3 for speedtest-cli (wifi.sh): ssl for speedtest.net, pyexpat for
+# its XML server list, zlib for the compressed replies
+BR2_PACKAGE_PYTHON3             = y
+BR2_PACKAGE_PYTHON3_SSL         = y
+BR2_PACKAGE_PYTHON3_PYEXPAT     = y
+BR2_PACKAGE_PYTHON3_ZLIB        = y
+# speedtest.net redirects to https; python's ssl verifies against these
+BR2_PACKAGE_CA_CERTIFICATES     = y
 BR2_PACKAGE_WIRELESS_REGDB      = y
 BR2_PACKAGE_IPROUTE2            = y
 BR2_PACKAGE_ETHTOOL             = y
@@ -439,11 +447,26 @@ $(LINUX_FW_DIR)/%:
 	echo "$(LINUX_FW_SHA256_$*)  $@.tmp" | sha256sum -c - || { rm -f $@.tmp; exit 1; }
 	mv $@.tmp $@
 
+# speedtest-cli (sivel, Apache-2.0, a single Python file) for the WiFi test:
+# fetched at the pinned tag into the overlay, the shebang pointed at python3
+# since the rootfs has no `python`.
+SPEEDTEST_CLI_REV    ?= v2.1.3
+SPEEDTEST_CLI_URL    ?= https://raw.githubusercontent.com/sivel/speedtest-cli/$(SPEEDTEST_CLI_REV)/speedtest.py
+SPEEDTEST_CLI_SHA256 ?= 2ac0eb95d1e6f7b691acbbc63f3586ade2981cb34c2840390ff262bd09971968
+SPEEDTEST_CLI = $(OVERLAY_DIR)/usr/bin/speedtest-cli
+
+$(SPEEDTEST_CLI):
+	mkdir -p $(dir $@)
+	curl --retry 5 -sSfL -o $@.tmp $(SPEEDTEST_CLI_URL)
+	echo "$(SPEEDTEST_CLI_SHA256)  $@.tmp" | sha256sum -c - || { rm -f $@.tmp; exit 1; }
+	sed -i '1s|^#!.*|#!/usr/bin/env python3|' $@.tmp
+	chmod 0755 $@.tmp && mv $@.tmp $@
+
 # Buildroot's target-finalize rsyncs every overlay and fails if one is absent.
 $(LINUX_PATH)/modules_dir:
 	mkdir -p $@
 
-buildroot: linux-firmware $(LINUX_PATH)/modules_dir
+buildroot: linux-firmware $(LINUX_PATH)/modules_dir $(SPEEDTEST_CLI)
 
 ################################################################################
 # efi.bin: FAT32 boot partition image with extlinux/extlinux.conf, Image and
