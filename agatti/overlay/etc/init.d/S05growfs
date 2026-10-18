@@ -11,7 +11,7 @@ start)
 	done
 	[ -b "$dev" ] || exit 0
 	part=$(( $(cat /sys/class/block/${dev##*/}/size) * 512 ))
-	fs=$(df -B1 / | awk 'NR == 2 {print $2}')
+	fs=$(( $(df -k / | awk 'NR == 2 {print $2}') * 1024 ))
 	# grow once: only when the fs is less than 90 % of the partition
 	if [ "$fs" -lt $(( part / 10 * 9 )) ]; then
 		echo "growfs: $dev to $(( part >> 20 )) MiB"
