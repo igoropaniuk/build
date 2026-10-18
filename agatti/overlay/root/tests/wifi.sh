@@ -51,6 +51,9 @@ if ip link show wlan0 >/dev/null 2>&1; then
 		while ! wpa_cli -i wlan0 status 2>/dev/null | grep -q 'wpa_state=COMPLETED' && [ $i -lt 20 ]; do sleep 1; i=$((i+1)); done
 		if wpa_cli -i wlan0 status 2>/dev/null | grep -q 'wpa_state=COMPLETED'; then
 			pass "associated after ${i}s"
+			# power save makes the board deaf between beacons: 100-450 ms
+			# RTT and ~0.2 MB/s for traffic towards it (ssh, scp)
+			iw dev wlan0 set power_save off
 			info "$(wpa_cli -i wlan0 status 2>/dev/null | grep -E '^(freq|key_mgmt|pairwise_cipher)=' | tr '\n' ' ')"
 			info "$(iw dev wlan0 link | grep -E 'signal|bitrate' | sed 's/^[ \t]*//' | tr '\n' ' ')"
 		else
