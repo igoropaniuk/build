@@ -159,6 +159,13 @@ BR2_PACKAGE_LIBQRTR_GLIB        = y
 BR2_PACKAGE_QRTR                = y
 BR2_PACKAGE_RMTFS               = y
 BR2_PACKAGE_TQFTPSERV           = y
+# ioquake3 on the console: SDL2 over KMS/DRM with GLES, sound via ALSA
+BR2_PACKAGE_SDL2                = y
+BR2_PACKAGE_SDL2_KMSDRM         = y
+BR2_PACKAGE_SDL2_OPENGLES       = y
+BR2_PACKAGE_IOQUAKE3            = y
+# the OpenArena data (391 MiB) does not fit the 512 MiB image
+BR2_TARGET_ROOTFS_EXT2_SIZE     = 1G
 # resize2fs for S05growfs (the rootfs image is smaller than its partition)
 BR2_PACKAGE_E2FSPROGS           = y
 BR2_PACKAGE_E2FSPROGS_RESIZE2FS = y
@@ -469,6 +476,25 @@ $(SPEEDTEST_CLI):
 	sed -i '1s|^#!.*|#!/usr/bin/env python3|' $@.tmp
 	chmod 0755 $@.tmp && mv $@.tmp $@
 
+# OpenArena 0.8.8 game data (GPL-2.0 code, content under GPL-2.0 /
+# CC-BY-SA, see the archive's readme) for ioquake3: baseoa/*.pk3 into the
+# overlay at /usr/lib/ioquake3/baseoa, git-ignored like the firmware.
+OPENARENA_ZIP    = openarena-0.8.8.zip
+OPENARENA_URL    ?= https://downloads.sourceforge.net/project/oarena/$(OPENARENA_ZIP)
+OPENARENA_SHA256 ?= 5a8faf7f5b51f351b0a1618c06b6b98a5f1a6758f1d39818de2c87df2a0bac4a
+OPENARENA_DATA   = $(OVERLAY_DIR)/usr/lib/ioquake3/baseoa/.stamp
+
+$(DL_DIR)/$(OPENARENA_ZIP):
+	mkdir -p $(DL_DIR)
+	curl --retry 5 -sSfL -o $@.tmp $(OPENARENA_URL)
+	echo "$(OPENARENA_SHA256)  $@.tmp" | sha256sum -c - || { rm -f $@.tmp; exit 1; }
+	mv $@.tmp $@
+
+$(OPENARENA_DATA): $(DL_DIR)/$(OPENARENA_ZIP)
+	rm -rf $(dir $@) && mkdir -p $(dir $@)
+	unzip -q -j -o $< 'openarena-0.8.8/baseoa/*.pk3' -d $(dir $@)
+	touch $@
+
 # Root login over ssh (dropbear) by key: the builder's public key goes into
 # the overlay (git-ignored); root has no password, which dropbear refuses.
 ROOT_AUTHORIZED_KEYS ?= $(wildcard $(HOME)/.ssh/id_ed25519.pub $(HOME)/.ssh/id_rsa.pub)
@@ -483,7 +509,8 @@ $(ROOT_SSH_KEYS):
 $(LINUX_PATH)/modules_dir:
 	mkdir -p $@
 
-buildroot: linux-firmware $(LINUX_PATH)/modules_dir $(SPEEDTEST_CLI) $(ROOT_SSH_KEYS)
+buildroot: linux-firmware $(LINUX_PATH)/modules_dir $(SPEEDTEST_CLI) $(ROOT_SSH_KEYS) \
+	   $(OPENARENA_DATA)
 
 ################################################################################
 # efi.bin: FAT32 boot partition image with extlinux/extlinux.conf, Image and

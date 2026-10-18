@@ -1,0 +1,14 @@
+config BR2_PACKAGE_IOQUAKE3
+	bool "ioquake3"
+	depends on BR2_PACKAGE_SDL2_KMSDRM
+	depends on BR2_PACKAGE_SDL2_OPENGLES
+	help
+	  ioquake3, the maintained Quake III Arena engine. Built for SDL2
+	  on KMS/DRM with the OpenGL ES renderer path (r_preferOpenGLES),
+	  so it runs on the console without X11 or Wayland. Game data
+	  (baseq3/pak*.pk3) is not included.
+
+	  https://github.com/ioquake/ioq3
+
+comment "ioquake3 needs SDL2 with KMSDRM and OpenGL ES"
+	depends on !BR2_PACKAGE_SDL2_KMSDRM || !BR2_PACKAGE_SDL2_OPENGLES
