@@ -4,7 +4,11 @@
 
 case "$1" in
 start)
-	dev=$(readlink -f /dev/disk/by-partlabel/rootfs 2>/dev/null)
+	# runs before udev: find the partition by its GPT name in sysfs
+	dev=
+	for u in /sys/class/block/*/uevent; do
+		grep -q '^PARTNAME=rootfs$' "$u" && dev=/dev/$(sed -n 's/^DEVNAME=//p' "$u") && break
+	done
 	[ -b "$dev" ] || exit 0
 	part=$(( $(cat /sys/class/block/${dev##*/}/size) * 512 ))
 	fs=$(df -B1 / | awk 'NR == 2 {print $2}')
