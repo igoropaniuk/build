@@ -1,0 +1,19 @@
+#!/bin/sh
+# DHCP on wired interfaces (USB Ethernet on a dock). wlan0 is left to
+# wifi.sh / wpa_supplicant.
+
+case "$1" in
+start)
+	for n in /sys/class/net/*; do
+		i=${n##*/}
+		case "$i" in eth*|en*|usb*) ;; *) continue ;; esac
+		ip link set "$i" up
+		udhcpc -b -i "$i" -p /var/run/udhcpc.$i.pid -x hostname:unoq >/dev/null 2>&1
+		echo "wired: dhcp on $i"
+	done
+	;;
+stop)
+	for p in /var/run/udhcpc.*.pid; do [ -f "$p" ] && kill "$(cat "$p")"; done
+	;;
+esac
+exit 0

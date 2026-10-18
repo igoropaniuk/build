@@ -159,6 +159,13 @@ BR2_PACKAGE_LIBQRTR_GLIB        = y
 BR2_PACKAGE_QRTR                = y
 BR2_PACKAGE_RMTFS               = y
 BR2_PACKAGE_TQFTPSERV           = y
+# resize2fs for S05growfs (the rootfs image is smaller than its partition)
+BR2_PACKAGE_E2FSPROGS           = y
+BR2_PACKAGE_E2FSPROGS_RESIZE2FS = y
+# SFTP for dropbear (scp -s, sshfs): gesftpserver as /usr/libexec/sftp-server
+BR2_PACKAGE_GESFTPSERVER        = y
+# root/root on the console and over ssh (dropbear); a development image
+BR2_TARGET_GENERIC_ROOT_PASSWD  = root
 BR2_PACKAGE_LIBQMI              = y
 BR2_PACKAGE_UQMI                = y
 BR2_PACKAGE_STRACE              = y
@@ -462,11 +469,21 @@ $(SPEEDTEST_CLI):
 	sed -i '1s|^#!.*|#!/usr/bin/env python3|' $@.tmp
 	chmod 0755 $@.tmp && mv $@.tmp $@
 
+# Root login over ssh (dropbear) by key: the builder's public key goes into
+# the overlay (git-ignored); root has no password, which dropbear refuses.
+ROOT_AUTHORIZED_KEYS ?= $(wildcard $(HOME)/.ssh/id_ed25519.pub $(HOME)/.ssh/id_rsa.pub)
+ROOT_SSH_KEYS = $(OVERLAY_DIR)/root/.ssh/authorized_keys
+
+.PHONY: $(ROOT_SSH_KEYS)
+$(ROOT_SSH_KEYS):
+	mkdir -p $(dir $@) && chmod 0700 $(dir $@)
+	cat /dev/null $(ROOT_AUTHORIZED_KEYS) > $@ && chmod 0600 $@
+
 # Buildroot's target-finalize rsyncs every overlay and fails if one is absent.
 $(LINUX_PATH)/modules_dir:
 	mkdir -p $@
 
-buildroot: linux-firmware $(LINUX_PATH)/modules_dir $(SPEEDTEST_CLI)
+buildroot: linux-firmware $(LINUX_PATH)/modules_dir $(SPEEDTEST_CLI) $(ROOT_SSH_KEYS)
 
 ################################################################################
 # efi.bin: FAT32 boot partition image with extlinux/extlinux.conf, Image and

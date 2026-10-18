@@ -1,0 +1,18 @@
+#!/bin/sh
+# Grow the root ext4 to fill its partition. The image is 512 MiB, the
+# rootfs partition on the UNO Q is ~28 GiB; online growing is safe.
+
+case "$1" in
+start)
+	dev=$(readlink -f /dev/disk/by-partlabel/rootfs 2>/dev/null)
+	[ -b "$dev" ] || exit 0
+	part=$(( $(cat /sys/class/block/${dev##*/}/size) * 512 ))
+	fs=$(df -B1 / | awk 'NR == 2 {print $2}')
+	# grow once: only when the fs is less than 90 % of the partition
+	if [ "$fs" -lt $(( part / 10 * 9 )) ]; then
+		echo "growfs: $dev to $(( part >> 20 )) MiB"
+		resize2fs "$dev" >/dev/null 2>&1 || echo "growfs: resize2fs failed"
+	fi
+	;;
+esac
+exit 0
