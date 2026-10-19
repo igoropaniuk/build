@@ -1,0 +1,4 @@
+# Keep the kernel's interface names (wlan0, eth0, usb0): this file masks
+# eudev's /lib/udev/rules.d/80-net-name-slot.rules, which since eudev
+# 3.2.15 (Buildroot master) renames wlan0 to wlx<mac>. The tests,
+# S41wired and wifi.sh expect the kernel names.
