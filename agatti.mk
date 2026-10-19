@@ -58,6 +58,11 @@ U-BOOT_PATH    ?= $(ROOT)/u-boot
 OUT_DIR         = $(CURDIR)/agatti/output
 DL_DIR         ?= $(ROOT)/downloads
 OVERLAY_DIR     = $(CURDIR)/agatti/overlay
+# GAME=n leaves ioquake3, its SDL2 backends, the OpenArena data and the
+# run_quake scripts out of the rootfs (a build to share); the game files
+# live in their own overlay so the plain overlay never carries them.
+GAME           ?= y
+GAME_OVERLAY_DIR = $(CURDIR)/agatti/overlay-game
 
 # Kernel flavour. One tree ($(ROOT)/linux), two branches, separate out-of-tree
 # build directories so the configs never mix:
@@ -159,6 +164,7 @@ BR2_PACKAGE_LIBQRTR_GLIB        = y
 BR2_PACKAGE_QRTR                = y
 BR2_PACKAGE_RMTFS               = y
 BR2_PACKAGE_TQFTPSERV           = y
+ifeq ($(GAME),y)
 # ioquake3 on the console: SDL2 over KMS/DRM with GLES, sound via ALSA
 BR2_PACKAGE_SDL2                = y
 BR2_PACKAGE_SDL2_KMSDRM         = y
@@ -166,6 +172,7 @@ BR2_PACKAGE_SDL2_OPENGLES       = y
 BR2_PACKAGE_IOQUAKE3            = y
 # the OpenArena data (391 MiB) does not fit the 512 MiB image
 BR2_TARGET_ROOTFS_EXT2_SIZE     = 1G
+endif
 # resize2fs for S05growfs (the rootfs image is smaller than its partition)
 BR2_PACKAGE_E2FSPROGS           = y
 BR2_PACKAGE_E2FSPROGS_RESIZE2FS = y
@@ -192,7 +199,8 @@ BR2_PACKAGE_MESA3D_DEMOS        = y
 BR2_PACKAGE_FBV                 = y
 # agatti/overlay carries /lib/firmware (ADSP image, fetched); modules_dir is
 # where a modules_install would land (empty, the kernels have MODULES=n).
-BR2_ROOTFS_OVERLAY = $(OVERLAY_DIR) $(LINUX_PATH)/modules_dir
+BR2_ROOTFS_OVERLAY = $(OVERLAY_DIR) $(LINUX_PATH)/modules_dir \
+	$(if $(filter y,$(GAME)),$(GAME_OVERLAY_DIR))
 BR2_ROOTFS_POST_BUILD_SCRIPT = $(ROOT)/build/agatti/br-post-build.sh
 
 FW_DIR          = $(CURDIR)/agatti/firmware
@@ -478,11 +486,11 @@ $(SPEEDTEST_CLI):
 
 # OpenArena 0.8.8 game data (GPL-2.0 code, content under GPL-2.0 /
 # CC-BY-SA, see the archive's readme) for ioquake3: baseoa/*.pk3 into the
-# overlay at /usr/lib/ioquake3/baseoa, git-ignored like the firmware.
+# game overlay at /usr/lib/ioquake3/baseoa, git-ignored like the firmware.
 OPENARENA_ZIP    = openarena-0.8.8.zip
 OPENARENA_URL    ?= https://downloads.sourceforge.net/project/oarena/$(OPENARENA_ZIP)
 OPENARENA_SHA256 ?= 5a8faf7f5b51f351b0a1618c06b6b98a5f1a6758f1d39818de2c87df2a0bac4a
-OPENARENA_DATA   = $(OVERLAY_DIR)/usr/lib/ioquake3/baseoa/.stamp
+OPENARENA_DATA   = $(GAME_OVERLAY_DIR)/usr/lib/ioquake3/baseoa/.stamp
 
 $(DL_DIR)/$(OPENARENA_ZIP):
 	mkdir -p $(DL_DIR)
@@ -510,7 +518,7 @@ $(LINUX_PATH)/modules_dir:
 	mkdir -p $@
 
 buildroot: linux-firmware $(LINUX_PATH)/modules_dir $(SPEEDTEST_CLI) $(ROOT_SSH_KEYS) \
-	   $(OPENARENA_DATA)
+	   $(if $(filter y,$(GAME)),$(OPENARENA_DATA))
 
 ################################################################################
 # efi.bin: FAT32 boot partition image with extlinux/extlinux.conf, Image and
