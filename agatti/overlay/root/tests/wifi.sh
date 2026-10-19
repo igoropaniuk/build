@@ -2,8 +2,12 @@
 # WiFi: WCN3990 through ath10k_snoc. The WLAN firmware runs on the modem
 # DSP, so this also checks the modem bring-up (rmtfs, tqftpserv, QRTR).
 #   ./wifi.sh              scan and list the visible networks, connect to none
-#   ./wifi.sh ssid psk     also associate, get a lease, ping, and time a 100 MB
-#                          speedtest-cli run (the link stays up afterwards)
+#   ./wifi.sh ssid psk [server]
+#                          also associate, get a lease, ping and measure the
+#                          link with speedtest-cli (the link stays up
+#                          afterwards); server is a speedtest.net server id
+#                          (speedtest-cli --list) for when the nearest one,
+#                          chosen from the public address, is unreachable
 . "$(dirname "$0")/lib.sh"
 
 section "modem"
@@ -65,12 +69,28 @@ if ip link show wlan0 >/dev/null 2>&1; then
 			ping -c 3 -W 3 $gw >/dev/null 2>&1 && pass "ping gateway $gw" || fail "ping gateway $gw"
 			ping -c 3 -W 3 1.1.1.1 >/dev/null 2>&1 && pass "ping 1.1.1.1" || fail "ping 1.1.1.1"
 			section "speedtest"
-			# speedtest-cli (sivel, Apache-2.0) against the nearest speedtest.net server
-			out=$(speedtest-cli --simple 2>&1)
-			if echo "$out" | grep -q '^Download:'; then
-				pass "$(echo "$out" | grep -E '^(Ping|Download|Upload):' | tr '\n' ' ' | sed 's/  */ /g')"
-			else
+			# speedtest-cli (sivel, Apache-2.0) over https: the plain http
+			# path geolocates a CGNAT address badly and then picks servers
+			# thousands of km away that fail the latency probe (0 Mbit/s).
+			# TLS needs a sane clock and the board has no RTC (1970 at boot):
+			# take the time from an HTTP Date header, there is no ntpd.
+			if [ "$(date +%s)" -lt 1000000000 ]; then
+				d=$(wget -q -S --spider http://1.1.1.1 2>&1 | sed -n 's/^ *Date: //p' | sed 's/ GMT$//' | head -1)
+				[ -n "$d" ] && date -u -D '%a, %d %b %Y %H:%M:%S' -s "$d" >/dev/null 2>&1 && info "clock set from an HTTP Date header: $(date -u)"
+			fi
+			# A ping of 1800000 ms means none of the chosen servers answered:
+			# no verdict on the link then; the third argument picks a server.
+			out=$(speedtest-cli --simple --secure ${3:+--server "$3"} 2>&1)
+			res=$(echo "$out" | grep -E '^(Ping|Download|Upload):' | tr '\n' ' ' | sed 's/  */ /g')
+			dl=$(echo "$out" | awk '/^Download:/ {print $2}')
+			if [ -z "$dl" ]; then
 				fail "speedtest-cli: $(echo "$out" | grep -v -i -E 'warning|utcnow' | tail -1)"
+			elif echo "$out" | grep -q '^Ping: 1800000'; then
+				skip "speedtest.net found no reachable server ($res); retry with a server id from speedtest-cli --list as the third argument"
+			elif [ "${dl%%.*}" -eq 0 ]; then
+				fail "speedtest: $res"
+			else
+				pass "$res"
 			fi
 		else
 			fail "DHCP"

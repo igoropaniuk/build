@@ -13,7 +13,7 @@ Peripheral tests for the Arduino UNO Q (open firmware stack, agatti-next).
   ./system.sh           CPUs, memory, eMMC, cpuidle/cpufreq
   ./audio.sh [S]        PM4125 headphone path: card, route, tone, power state
   ./audio-route.sh      route the card for playback/capture (used by audio.sh)
-  ./wifi.sh [ssid psk]  modem (rmtfs/tqftpserv/QRTR), wlan0, scan; with credentials: associate + DHCP
+  ./wifi.sh [ssid psk [server]]  modem (rmtfs/tqftpserv/QRTR), wlan0, scan; with credentials: associate + DHCP + speedtest-cli (server: speedtest.net id)
 
 Each script prints PASS/FAIL/SKIP lines and a summary; the exit status
 is non-zero when something failed. Logs of the heavier steps land in
