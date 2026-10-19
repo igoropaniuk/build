@@ -58,6 +58,12 @@ U-BOOT_PATH    ?= $(ROOT)/u-boot
 OUT_DIR         = $(CURDIR)/agatti/output
 DL_DIR         ?= $(ROOT)/downloads
 OVERLAY_DIR     = $(CURDIR)/agatti/overlay
+# Buildroot source: a git worktree of buildroot/ on branch agatti-next, so
+# the buildroot/ checkout itself stays free for preparing upstream patches
+# (switching branches or editing there mid-build would change what a
+# running build picks up). Create it once with
+#   git -C $(ROOT)/buildroot worktree add $(ROOT)/buildroot-agatti-next agatti-next
+BUILDROOT_SRC  ?= buildroot-agatti-next
 # GAME=n leaves ioquake3, its SDL2 backends, the OpenArena data and the
 # run_quake scripts out of the rootfs (a build to share); the game files
 # live in their own overlay so the plain overlay never carries them.
@@ -159,8 +165,10 @@ BR2_PACKAGE_ALSA_UTILS_APLAY    = y
 BR2_PACKAGE_ALSA_UTILS_AMIXER   = y
 BR2_PACKAGE_ALSA_UTILS_SPEAKER_TEST = y
 BR2_PACKAGE_LIBQRTR_GLIB        = y
-# Modem userspace (br-ext packages): rmtfs serves the EFS partitions and
-# boots the modem, tqftpserv hands it the WLAN firmware over QRTR.
+# Modem userspace (Buildroot agatti-next: package/qrtr, rmtfs, tqftpserv,
+# headed upstream): rmtfs serves the EFS partitions, tqftpserv hands the
+# modem the WLAN firmware over QRTR; their init scripts start both, and
+# S46modem starts the modem after them.
 BR2_PACKAGE_QRTR                = y
 BR2_PACKAGE_RMTFS               = y
 BR2_PACKAGE_TQFTPSERV           = y

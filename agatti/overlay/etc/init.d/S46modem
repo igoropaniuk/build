@@ -1,0 +1,37 @@
+#!/bin/sh
+# Bring up the modem DSP, which hosts the WLAN firmware. It needs two
+# daemons, started before this by the Buildroot packages' init scripts:
+# tqftpserv (S44) serves the files the modem asks for over QRTR
+# (wlanmdsp.mbn from /lib/firmware/qcom/qcm2290), rmtfs (S45) the EFS
+# partitions (modemst1/2, fsg, fsc, by GPT label) through the rmtfs shared
+# memory. The modem is started here once both run (rmtfs -s would do it
+# too, but restarts it on every rmtfs hiccup). The ath10k_snoc driver
+# brings up wlan0 when the WLAN firmware reports ready, some 7 s later.
+
+modem_rproc() {
+	for r in /sys/class/remoteproc/remoteproc*; do
+		[ "$(cat $r/name 2>/dev/null)" = modem ] && echo $r && return
+	done
+}
+
+case "$1" in
+start)
+	[ -e /dev/qcom_rmtfs_mem1 ] || { echo "modem: no rmtfs memory"; exit 0; }
+	for d in tqftpserv rmtfs; do
+		pidof $d >/dev/null || echo "modem: $d is not running"
+	done
+	M=$(modem_rproc)
+	if [ -z "$M" ]; then
+		echo "modem: no modem remoteproc"
+	elif echo start > $M/state 2>/dev/null; then
+		echo "modem: starting"
+	else
+		echo "modem: start failed"
+	fi
+	;;
+stop)
+	M=$(modem_rproc)
+	[ -n "$M" ] && echo stop > $M/state 2>/dev/null
+	;;
+esac
+exit 0

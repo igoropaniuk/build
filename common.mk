@@ -339,6 +339,9 @@ endif
 # environment for the rest of the build.
 HOST_TOOLS_ENV ?= env -u LD_LIBRARY_PATH -u PYTHONHOME -u PYTHONPATH
 
+# Buildroot source tree, relative to $(ROOT)
+BUILDROOT_SRC ?= buildroot
+
 .PHONY: buildroot
 buildroot: optee-os
 	@mkdir -p ../out-br
@@ -346,7 +349,7 @@ buildroot: optee-os
 	@rm -f ../out-br/extra.conf
 	@$(call append-br2-vars,../out-br/extra.conf)
 	@(cd .. && $(HOST_TOOLS_ENV) $(PYTHON3) build/br-ext/scripts/make_def_config.py \
-		--br buildroot --out out-br --br-ext build/br-ext \
+		--br $(BUILDROOT_SRC) --out out-br --br-ext build/br-ext \
 		--top-dir "$(ROOT)" \
 		--br-defconfig build/br-ext/configs/optee_$(BUILDROOT_ARCH) \
 		--br-defconfig build/br-ext/configs/optee_generic \

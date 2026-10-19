@@ -1,8 +1,0 @@
-config BR2_PACKAGE_QRTR
-	bool "qrtr"
-	help
-	  Qualcomm IPC Router (QRTR) library and tools: libqrtr,
-	  qrtr-cfg and qrtr-lookup. The name service runs in the
-	  kernel (CONFIG_QRTR), so qrtr-ns is not built.
-
-	  https://github.com/linux-msm/qrtr
