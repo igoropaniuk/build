@@ -642,7 +642,7 @@ firmware-clean:
 ################################################################################
 QDL        ?= /home/xdev/qualcomm/reps/qdl.git/build/qdl
 PYTAC      ?= pytactl
-BUGHOPPER  ?= DK0HDRE8
+BUGHOPPER  ?= DK0HEQZ2
 FLASH_DIR   = $(OUT_DIR)/flash
 ROOTFS_EXT4 = $(ROOT)/out-br/images/rootfs.ext4
 FW_FLASH_FILES = $(PTOOL_FILES) $(filter-out LICENSE.qcom-2 readme.txt prog_firehose_lite.elf,$(FW_BLOBS)) dtb.bin
