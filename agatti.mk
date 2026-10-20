@@ -63,7 +63,8 @@ OVERLAY_DIR     = $(CURDIR)/agatti/overlay
 # (switching branches or editing there mid-build would change what a
 # running build picks up). Create it once with
 #   git -C $(ROOT)/buildroot worktree add $(ROOT)/buildroot-agatti-next agatti-next
-BUILDROOT_SRC  ?= buildroot-agatti-next
+# A plain repo checkout (manifest agatti-next.xml) has only buildroot/.
+BUILDROOT_SRC  ?= $(if $(wildcard $(ROOT)/buildroot-agatti-next/Makefile),buildroot-agatti-next,buildroot)
 # GAME=n leaves ioquake3, its SDL2 backends, the OpenArena data and the
 # run_quake scripts out of the rootfs (a build to share); the game files
 # live in their own overlay so the plain overlay never carries them.
@@ -632,8 +633,9 @@ $(FW_DIR)/dtb.bin: $(LINUX_DTB)
 	mkfs.fat -F 12 $@ >/dev/null
 	mcopy -i $@ $(LINUX_DTB) ::/combined-dtb.dtb
 
+# keeps the tracked .gitignore that makes the fetched blobs ignored
 firmware-clean:
-	rm -rf $(FW_DIR)
+	test ! -d $(FW_DIR) || find $(FW_DIR) -mindepth 1 -maxdepth 1 ! -name .gitignore -exec rm -rf {} +
 
 ################################################################################
 # Flash: board in EDL through the Bughopper (pytactl), images written by qdl.
