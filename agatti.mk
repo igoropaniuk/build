@@ -478,6 +478,15 @@ $(LINUX_FW_DIR)/%:
 	echo "$(LINUX_FW_SHA256_$*)  $@.tmp" | sha256sum -c - || { rm -f $@.tmp; exit 1; }
 	mv $@.tmp $@
 
+# The mainline kernel embeds EMBEDDED_FW through CONFIG_EXTRA_FIRMWARE, so the
+# Image link needs those files in place first. buildroot fetches them too, but
+# linux can be built on its own (bootimage/linux before buildroot), so depend
+# on them here as well. Prerequisites expand at parse time, so this has to
+# come after LINUX_FW_DIR.
+ifeq ($(KERNEL),mainline)
+linux: $(addprefix $(LINUX_FW_DIR)/,$(EMBEDDED_FW))
+endif
+
 # speedtest-cli (sivel, Apache-2.0, a single Python file) for the WiFi test:
 # fetched at the pinned tag into the overlay, the shebang pointed at python3
 # since the rootfs has no `python`.
