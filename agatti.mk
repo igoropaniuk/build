@@ -21,6 +21,7 @@
 #   flash-full     Full eMMC flash via rawprogram0.xml (GPT + stock firmware +
 #                  tz/uefi + efi + rootfs); flash-loader / flash-kernel update
 #                  only tz+uefi or efi+rootfs
+#   qcomflash      The flash-full set in agatti/output/flash/, no board access
 #   all            Everything above that produces files
 ################################################################################
 
@@ -235,6 +236,7 @@ help:
 	@echo "  make buildroot     Rootfs (out-br/images/rootfs.ext4)"
 	@echo "  make efi           agatti/output/efi.bin (extlinux.conf + Image + DTB)"
 	@echo "  make firmware      Fetch stock blobs + generate the partition layout (agatti/firmware/)"
+	@echo "  make qcomflash     Full EDL flash set in agatti/output/flash/ (no board access)"
 	@echo ""
 	@echo "Flash targets (board on the Bughopper, EDL via pytactl + qdl)"
 	@echo "  make flash-full    GPT + stock firmware + tz/uefi + efi + rootfs"
@@ -658,9 +660,12 @@ FLASH_DIR   = $(OUT_DIR)/flash
 ROOTFS_EXT4 = $(ROOT)/out-br/images/rootfs.ext4
 FW_FLASH_FILES = $(PTOOL_FILES) $(filter-out LICENSE.qcom-2 readme.txt prog_firehose_lite.elf,$(FW_BLOBS)) dtb.bin
 
-.PHONY: flash-full flash-loader flash-uefi flash-kernel
+.PHONY: qcomflash flash-full flash-loader flash-uefi flash-kernel
 
-flash-full: firmware
+# The complete EDL flash set in one directory, without touching the board:
+# flash it from another machine (e.g. a macOS host when building in a
+# container without USB) with the qdl line of flash-full.
+qcomflash: firmware
 	@for f in $(OUT_DIR)/tz.mbn $(OUT_DIR)/uefi.elf $(EFI_BIN) $(ROOTFS_EXT4); do \
 		test -f "$$f" || { echo "ERROR: $$f missing, run make all first"; exit 1; }; \
 	done
@@ -669,6 +674,10 @@ flash-full: firmware
 	cp $(addprefix $(FW_DIR)/,$(FW_FLASH_FILES)) $(FLASH_DIR)/
 	cp $(OUT_DIR)/tz.mbn $(OUT_DIR)/uefi.elf $(EFI_BIN) $(FLASH_DIR)/
 	cp $(ROOTFS_EXT4) $(FLASH_DIR)/rootfs.img
+	@echo "Flash set ready: $(FLASH_DIR)"
+	@echo "Flash: cd $(FLASH_DIR) && qdl --storage emmc -R prog_firehose_ddr.elf rawprogram0.xml patch0.xml"
+
+flash-full: qcomflash
 	$(PYTAC) oneshot bootToEDL --serial=$(BUGHOPPER) || true
 	sleep 8
 	cd $(FLASH_DIR) && \
