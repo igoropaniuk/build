@@ -227,6 +227,18 @@ all: bootimage linux buildroot efi firmware
 
 clean: bootimage-clean linux-clean buildroot-clean efi-clean firmware-clean
 
+# Ubuntu 24.04 packages for building everything here (a fresh container too)
+HOST_DEPS = acpica-tools adb autoconf automake bc bison build-essential ccache \
+	    cpio cscope curl device-tree-compiler dosfstools e2tools expect \
+	    fastboot flex ftp-upload gdisk git libattr1-dev libcap-ng-dev \
+	    libfdt-dev libftdi-dev libglib2.0-dev libgmp3-dev libgnutls28-dev \
+	    libhidapi-dev libmpc-dev libncurses5-dev libpixman-1-dev \
+	    libslirp-dev libssl-dev libtool libusb-1.0-0-dev make mtools \
+	    netcat-openbsd ninja-build python-is-python3 python3-cryptography \
+	    python3-jsonschema python3-pip python3-pyelftools python3-serial \
+	    python3-tomli python3-yaml rsync swig unzip uuid-dev wget xdg-utils \
+	    xsltproc xterm xxd xz-utils zlib1g-dev
+
 help:
 	@echo "Qualcomm QCM2290/QRB2210 (Agatti / Arduino UNO Q) build system"
 	@echo ""
@@ -244,6 +256,9 @@ help:
 	@echo "  make flash-kernel  efi + rootfs only"
 	@echo ""
 	@echo "Per-component: optee-os u-boot tfa bl2-sign linux-defconfig linux-config and *-clean"
+	@echo ""
+	@echo "Host dependencies (Ubuntu 24.04):"
+	@echo "  sudo apt-get install -y" $(HOST_DEPS) | fold -s -w 76 | sed '$$!s/ *$$/ \\/; 2,$$s/^/    /'
 
 ################################################################################
 # OP-TEE OS
