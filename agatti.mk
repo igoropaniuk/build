@@ -622,7 +622,13 @@ PTOOL_FILES      = gpt_main0.bin gpt_backup0.bin gpt_both0.bin rawprogram0.xml \
 
 .PHONY: firmware firmware-blobs firmware-ptool firmware-clean
 
-firmware: firmware-blobs firmware-ptool $(FW_DIR)/dtb.bin
+firmware: firmware-blobs firmware-ptool $(FW_DIR)/dtb.bin $(FW_DIR)/xbl_feature_config.elf
+
+# XBL feature config for xbl_config_a/b: the stock XBL does not boot without
+# it, and no Qualcomm download carries it (see agatti/blobs/README.md).
+$(FW_DIR)/xbl_feature_config.elf: agatti/blobs/xbl_feature_config.elf
+	mkdir -p $(FW_DIR)
+	cp $< $@
 
 $(DL_DIR)/$(FW_ZIP):
 	mkdir -p $(DL_DIR)
@@ -648,6 +654,10 @@ firmware-ptool: | $(QCOM_PTOOL_PATH)
 		platforms/$(PTOOL_BOARD)/emmc/gpt
 	mkdir -p $(FW_DIR)
 	cp $(addprefix $(PTOOL_LAYOUT)/,$(PTOOL_FILES)) $(FW_DIR)/
+	# qcom-ptool leaves xbl_config_a/b empty; point them at the committed
+	# feature config, which the stock XBL requires to boot.
+	sed -i -e '/label="xbl_config_[ab]"/s/filename=""/filename="xbl_feature_config.elf"/' \
+		$(FW_DIR)/rawprogram0.xml
 
 $(LINUX_DTB):
 	$(MAKE) -f agatti.mk KERNEL=$(KERNEL) linux
@@ -673,7 +683,7 @@ PYTAC      ?= pytactl
 BUGHOPPER  ?= DK0HEQZ2
 FLASH_DIR   = $(OUT_DIR)/flash
 ROOTFS_EXT4 = $(ROOT)/out-br/images/rootfs.ext4
-FW_FLASH_FILES = $(PTOOL_FILES) $(filter-out LICENSE.qcom-2 readme.txt prog_firehose_lite.elf,$(FW_BLOBS)) dtb.bin
+FW_FLASH_FILES = $(PTOOL_FILES) $(filter-out LICENSE.qcom-2 readme.txt prog_firehose_lite.elf,$(FW_BLOBS)) dtb.bin xbl_feature_config.elf
 
 .PHONY: qcomflash flash-full flash-loader flash-uefi flash-kernel
 
